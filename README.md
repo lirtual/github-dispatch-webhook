@@ -7,7 +7,9 @@ A lightweight Cloudflare Workers implementation for triggering GitHub repository
 - Serverless implementation using Cloudflare Workers
 - Minimal configuration required
 - Secure GitHub token handling
-- Customizable repository targeting
+- Dynamic repository targeting via URL path
+- Custom event type support via URL path
+- Preserves original request headers and body content
 - Easy to deploy and maintain
 
 ## Prerequisites
@@ -22,24 +24,22 @@ A lightweight Cloudflare Workers implementation for triggering GitHub repository
 1. [Fork this repository](https://github.com/lirtual/github-dispatch-webhook/fork) by clicking the 'Fork' button in the top-right corner
 2. Go to your forked repository's settings
 3. Navigate to 'Secrets and variables' → 'Actions'
-4. Add the following repository secrets:
+4. Add the following repository secret:
    - `GITHUB_TOKEN`: Your GitHub Personal Access Token
-   - `REPO_PATH`: Your target repository path (e.g., `your-username/your-repo`)
 
 ### 2. Setup Cloudflare Worker
 1. Log in to your Cloudflare dashboard
 2. Navigate to Workers & Pages
 3. Create a new Worker
-4. Copy the content from `src/worker.js` to your new Worker
-5. Add Environment Variables in your Worker settings:
+4. Copy the content from `_worker.js` to your new Worker
+5. Add Environment Variable in your Worker settings:
    - `GITHUB_TOKEN`: Your GitHub Personal Access Token
-   - `REPO_PATH`: Your target repository path
 
 ### 3. Deploy and Test
 1. Deploy your Worker using the Cloudflare dashboard
 2. Test the webhook by sending a POST request to your Worker URL:
 ```bash
-curl -X POST https://your-worker.your-subdomain.workers.dev
+curl -X POST https://your-worker.your-subdomain.workers.dev/webhook/owner/repo/deploy
 ```
 
 ## Setup
@@ -56,10 +56,9 @@ npm install -g wrangler
 ```
 
 ### 3. Configure environment variables
-In your Cloudflare Workers dashboard, set the following environment variables:
+In your Cloudflare Workers dashboard, set the following environment variable:
 
 - `GITHUB_TOKEN`: Your GitHub Personal Access Token
-- `REPO_PATH`: Repository path in format `owner/repo` (e.g., `ray-workspace/cognideep_server`)
 
 ### 4. Deploy to Cloudflare Workers
 ```bash
@@ -68,25 +67,40 @@ wrangler publish
 
 ## Usage
 
-Send a POST request to your worker's URL to trigger a repository dispatch event:
+Send a POST request to your worker's URL with the repository and event type in the path:
 
 ```bash
-curl -X POST https://your-worker.your-subdomain.workers.dev
+curl -X POST https://your-worker.your-subdomain.workers.dev/webhook/{owner}/{repo}/{event_type}
 ```
 
-The worker will send a repository dispatch event to the configured GitHub repository with the event type "deploy".
+For example:
+```bash
+# Trigger a 'deploy' event
+curl -X POST https://your-worker.your-subdomain.workers.dev/webhook/ray-workspace/cognideep_server/deploy
+
+# Trigger a 'test' event
+curl -X POST https://your-worker.your-subdomain.workers.dev/webhook/ray-workspace/cognideep_server/test
+```
+
+You can also include a JSON body that will be forwarded to the GitHub API:
+```bash
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"client_payload": {"environment": "production"}}' \
+  https://your-worker.your-subdomain.workers.dev/webhook/ray-workspace/cognideep_server/deploy
+```
 
 ## Configuration
 
 ### wrangler.toml
 ```toml
 name = "github-dispatch-webhook"
-main = "src/worker.js"
+main = "_worker.js"
 compatibility_date = "2023-01-01"
 
 [vars]
-# Default repository path (can be overridden by environment variables)
-REPO_PATH = "owner/repo"
+# Only GITHUB_TOKEN is required as an environment variable
+# REPO_PATH and event_type are now specified in the URL path
 ```
 
 ## Security Considerations
